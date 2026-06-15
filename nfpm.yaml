@@ -1,0 +1,22 @@
+name: bloc-agent
+arch: amd64
+platform: linux
+version: ${VERSION}
+maintainer: Blocstor <blocstor@example.com>
+description: Storage node agent for the Blocstor DRBD storage stack
+license: Apache-2.0
+
+contents:
+  - src: bloc-agent
+    dst: /usr/local/bin/bloc-agent
+    file_info:
+      mode: 0755
+
+  - src: systemd/bloc-agent.service
+    dst: /etc/systemd/system/bloc-agent.service
+    file_info:
+      mode: 0644
+
+scripts:
+  postinstall: |
+    systemctl daemon-reload
