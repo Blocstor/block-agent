@@ -1,0 +1,11 @@
+[Unit]
+Description=Bloc Storage Node Agent
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/bloc-agent --listen :8080
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
