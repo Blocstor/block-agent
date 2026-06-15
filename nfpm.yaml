@@ -18,5 +18,4 @@ contents:
       mode: 0644
 
 scripts:
-  postinstall: |
-    systemctl daemon-reload
+  postinstall: packaging/postinstall.sh
