@@ -52,6 +52,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            goarch: amd64
+          - arch: arm64
+            goarch: arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +68,7 @@ jobs:
           go-version: "1.22"
 
       - name: Build binary
-        run: go build -o bloc-agent ./cmd/agent
+        run: GOARCH=${{ matrix.goarch }} go build -o bloc-agent ./cmd/agent
 
       - name: Install nfpm
         run: |
@@ -73,12 +80,13 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
         run: |
-          nfpm package --packager deb --target bloc-agent_${{ github.ref_name }}_amd64.deb
-          nfpm package --packager rpm --target bloc-agent_${{ github.ref_name }}_amd64.rpm
+          sed 's/arch: amd64/arch: ${{ matrix.arch }}/' nfpm.yaml > nfpm-build.yaml
+          nfpm package --config nfpm-build.yaml --packager deb --target bloc-agent_${{ github.ref_name }}_${{ matrix.arch }}.deb
+          nfpm package --config nfpm-build.yaml --packager rpm --target bloc-agent_${{ github.ref_name }}_${{ matrix.arch }}.rpm
 
-      - name: Create release
+      - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            bloc-agent_${{ github.ref_name }}_amd64.deb
-            bloc-agent_${{ github.ref_name }}_amd64.rpm
+            bloc-agent_${{ github.ref_name }}_${{ matrix.arch }}.deb
+            bloc-agent_${{ github.ref_name }}_${{ matrix.arch }}.rpm
