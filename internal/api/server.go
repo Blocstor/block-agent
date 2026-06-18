@@ -10,15 +10,18 @@ import (
 
 // Server holds the HTTP mux and logger for the agent API.
 type Server struct {
-	mux    *http.ServeMux
-	logger *slog.Logger
+	mux      *http.ServeMux
+	logger   *slog.Logger
+	thinpool string
 }
 
 // NewServer creates a new Server, registers all routes, and returns it.
-func NewServer(logger *slog.Logger) *Server {
+// thinpool is optional: when non-empty, LV creation uses thin provisioning from this pool.
+func NewServer(logger *slog.Logger, thinpool string) *Server {
 	s := &Server{
-		mux:    http.NewServeMux(),
-		logger: logger,
+		mux:      http.NewServeMux(),
+		logger:   logger,
+		thinpool: thinpool,
 	}
 	s.registerRoutes()
 	return s
@@ -92,8 +95,8 @@ func (s *Server) handleLVCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name, vg, and size_mb (>0) are required")
 		return
 	}
-	s.logger.Info("lv create", "vg", req.VG, "name", req.Name, "size_mb", req.SizeMB)
-	if err := exec.CreateLV(req.VG, req.Name, req.SizeMB); err != nil {
+	s.logger.Info("lv create", "vg", req.VG, "name", req.Name, "size_mb", req.SizeMB, "thinpool", s.thinpool)
+	if err := exec.CreateLV(req.VG, req.Name, s.thinpool, req.SizeMB); err != nil {
 		s.logger.Error("lv create failed", "err", err)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

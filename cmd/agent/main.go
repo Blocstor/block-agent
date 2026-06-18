@@ -16,13 +16,14 @@ import (
 func main() {
 	listen := flag.String("listen", ":8080", "address to listen on")
 	logLevel := flag.String("log-level", "info", "log level: debug, info, warn, error")
+	thinpool := flag.String("thinpool", "", "LVM thin pool name for thin-provisioned LV creation (optional)")
 	flag.Parse()
 
 	level := parseLogLevel(*logLevel)
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(logger)
 
-	srv := api.NewServer(logger)
+	srv := api.NewServer(logger, *thinpool)
 
 	httpSrv := &http.Server{
 		Addr:    *listen,

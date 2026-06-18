@@ -5,8 +5,11 @@ import (
 )
 
 // CreateLV creates a logical volume with the given name, volume group, and size in megabytes.
-// Runs: lvcreate -n <name> -L <size>M <vg>
-func CreateLV(vg, name string, sizeMB int) error {
+// When thinpool is non-empty, creates a thin LV from that pool instead of a regular LV.
+func CreateLV(vg, name, thinpool string, sizeMB int) error {
+	if thinpool != "" {
+		return runCmd("lvcreate", "-n", name, "-V", fmt.Sprintf("%dM", sizeMB), "--thinpool", vg+"/"+thinpool)
+	}
 	return runCmd("lvcreate", "-n", name, "-L", fmt.Sprintf("%dM", sizeMB), vg)
 }
 
