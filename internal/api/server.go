@@ -50,6 +50,13 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("POST /drbd/secondary", s.handleDRBDSecondary)
 	s.mux.HandleFunc("POST /drbd/resize", s.handleDRBDResize)
 	s.mux.HandleFunc("GET /drbd/status", s.handleDRBDStatus)
+
+	s.mux.HandleFunc("GET /vm/blklist", s.handleVMBlklist)
+	s.mux.HandleFunc("POST /vm/attach", s.handleVMAttach)
+	s.mux.HandleFunc("POST /vm/detach", s.handleVMDetach)
+
+	s.mux.HandleFunc("POST /nbd/serve", s.handleNBDServe)
+	s.mux.HandleFunc("POST /nbd/stop", s.handleNBDStop)
 }
 
 // writeError writes a JSON error response with the given HTTP status code.
@@ -346,4 +353,116 @@ func (s *Server) handleDRBDStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+}
+
+// VM handlers
+
+func (s *Server) handleVMBlklist(w http.ResponseWriter, r *http.Request) {
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		writeError(w, http.StatusBadRequest, "domain query parameter is required")
+		return
+	}
+	s.logger.Info("vm blklist", "domain", domain)
+	targets, err := exec.VMBlockList(domain)
+	if err != nil {
+		s.logger.Error("vm blklist failed", "err", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string][]string{"targets": targets})
+}
+
+type vmAttachRequest struct {
+	Domain string `json:"domain"`
+	Source string `json:"source"`
+	Target string `json:"target"`
+}
+
+func (s *Server) handleVMAttach(w http.ResponseWriter, r *http.Request) {
+	var req vmAttachRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Domain == "" || req.Source == "" || req.Target == "" {
+		writeError(w, http.StatusBadRequest, "domain, source, and target are required")
+		return
+	}
+	s.logger.Info("vm attach", "domain", req.Domain, "source", req.Source, "target", req.Target)
+	if err := exec.VMAttach(req.Domain, req.Source, req.Target); err != nil {
+		s.logger.Error("vm attach failed", "err", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type vmDetachRequest struct {
+	Domain string `json:"domain"`
+	Target string `json:"target"`
+}
+
+func (s *Server) handleVMDetach(w http.ResponseWriter, r *http.Request) {
+	var req vmDetachRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Domain == "" || req.Target == "" {
+		writeError(w, http.StatusBadRequest, "domain and target are required")
+		return
+	}
+	s.logger.Info("vm detach", "domain", req.Domain, "target", req.Target)
+	if err := exec.VMDetach(req.Domain, req.Target); err != nil {
+		s.logger.Error("vm detach failed", "err", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// NBD handlers
+
+type nbdServeRequest struct {
+	Device string `json:"device"`
+	Port   int    `json:"port"`
+}
+
+func (s *Server) handleNBDServe(w http.ResponseWriter, r *http.Request) {
+	var req nbdServeRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Device == "" || req.Port <= 0 {
+		writeError(w, http.StatusBadRequest, "device and port are required")
+		return
+	}
+	s.logger.Info("nbd serve", "device", req.Device, "port", req.Port)
+	if err := exec.NBDServe(req.Device, req.Port); err != nil {
+		s.logger.Error("nbd serve failed", "err", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type nbdStopRequest struct {
+	Port int `json:"port"`
+}
+
+func (s *Server) handleNBDStop(w http.ResponseWriter, r *http.Request) {
+	var req nbdStopRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Port <= 0 {
+		writeError(w, http.StatusBadRequest, "port is required")
+		return
+	}
+	s.logger.Info("nbd stop", "port", req.Port)
+	if err := exec.NBDStop(req.Port); err != nil {
+		s.logger.Error("nbd stop failed", "err", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
