@@ -57,6 +57,8 @@ func (s *Server) registerRoutes() {
 
 	s.mux.HandleFunc("POST /nbd/serve", s.handleNBDServe)
 	s.mux.HandleFunc("POST /nbd/stop", s.handleNBDStop)
+
+	s.mux.HandleFunc("GET /quorum", s.handleQuorum)
 }
 
 // writeError writes a JSON error response with the given HTTP status code.
@@ -465,4 +467,14 @@ func (s *Server) handleNBDStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleQuorum(w http.ResponseWriter, r *http.Request) {
+	q, err := exec.ClusterQuorate()
+	if err != nil {
+		s.logger.Error("quorum check failed", "err", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"quorate": q})
 }
