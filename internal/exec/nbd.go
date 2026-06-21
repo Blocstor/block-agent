@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // NBDServe starts a qemu-nbd server for the given device on the given TCP port.
@@ -35,5 +36,26 @@ func NBDStop(port int) error {
 	for _, pid := range pids {
 		exec.Command("kill", pid).Run() //nolint:errcheck
 	}
-	return nil
+	// Wait for processes to exit (up to 3 seconds)
+	for i := 0; i < 30; i++ {
+		_, err := exec.Command("pgrep", "-f", "qemu-nbd.*--port.*"+portStr).Output()
+		if err != nil {
+			// No processes left
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	// If still running, force kill
+	for _, pid := range pids {
+		exec.Command("kill", "-9", pid).Run() //nolint:errcheck
+	}
+	// Wait another second
+	for i := 0; i < 10; i++ {
+		_, err := exec.Command("pgrep", "-f", "qemu-nbd.*--port.*"+portStr).Output()
+		if err != nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("qemu-nbd process for port %d failed to stop", port)
 }
